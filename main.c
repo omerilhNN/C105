@@ -1,63 +1,76 @@
-// Client side C program to demonstrate Socket
-// programming
-#include <stdio.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <winsock2.h>
-#pragma comment(lib, "ws2_32.lib")
+#include <ws2tcpip.h>
+#include <stdio.h>
 
-#define PORT 23
-
-int main(int argc, char const* argv[])
+int main()
 {
-    WSADATA wsa; //Winsock api'nin baþlatýlmasý için
-    SOCKET client_fd;//iletisim kurmak icin bir client socket tanýmlanýr - bu socket icin bir tam sayý atanýr
-    struct sockaddr_in serv_addr;//sunucu adresi ve baglanti bilgilerini tutacak olan tanýmlayýcý
-    char* hello = "Hello from client";
-    char buffer[1024] = { 0 };
+    WSADATA wsaData;
+    SOCKET ListenSocket, ClientSocket;
+    struct sockaddr_in server, client;
+    int clientLen = sizeof(client);
+    char recvbuf[100];
+    int iResult;
 
-    // Initialize Winsock - 0'sa basarili
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { //MAKEWORD 8bit deðerini birleþtirerek 16bitlik bir deðer oluþturur - 0x0202 dondurur -> WinsockApi 2.2 sürümü
-        printf("WSAStartup failed.\n");
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        printf("WSAStartup failed: %d\n", WSAGetLastError());
         return 1;
     }
 
-    //client'ý socket'e tanýmlamak icin / AF_INET = IPv4 / SOCK_STREAM = TCP
-    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        printf("\n Socket creation error \n");
+    ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (ListenSocket == INVALID_SOCKET) {
+        printf("socket failed: %d\n", WSAGetLastError());
+        WSACleanup();
         return 1;
     }
 
-    serv_addr.sin_family = AF_INET;//socket internetin(sin) ailesini IPv4 olarak ayarla -
-    serv_addr.sin_port = htons(PORT);//Host TO Network Short - host byte sýrasýndaki bir degeri network byte'a cevirir - SORUN YASANMAMASI ICIN
+    server.sin_family = AF_INET;
+    server.sin_port = htons(23);
 
-    // inet_pton(internet presentation to network) Sunucunun IP adresini ayarlar - IP adresini text'den BINARY formuna getirir
-    if (inet_pton(AF_INET, "192.168.254.12", &serv_addr.sin_addr)<= 0) {
-        printf(
-            "\nInvalid address/ Address not supported \n");
-        return 1;
-    }
-    //client icin olusturulan socket sunucuya baglanir
-    if (connect(client_fd, (struct sockaddr*)&serv_addr,
-        sizeof(serv_addr)) < 0) {
-        printf("\nConnection Failed \n");
+    if (inet_pton(AF_INET,"192.168.0.36",&server.sin_addr)<= 0 ) {
+        printf("Invalid address");
         return 1;
     }
 
-    send(client_fd, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
-
-    int valread;
-    if ((valread = recv(client_fd, buffer, 1024, 0)) ==
-        SOCKET_ERROR) {
-        printf("\nReceive failed \n");
-    }
-    else {
-        buffer[valread] = '\0'; // add null terminator
-        printf("%s\n", buffer);
-        printf("Receive succesful");
+    if (bind(ListenSocket, (SOCKADDR*)&server, sizeof(server)) == SOCKET_ERROR) {
+        printf("bind failed: %d\n", WSAGetLastError());
+        closesocket(ListenSocket);
+        WSACleanup();
+        return 1;
     }
 
-    // closing the connected socket
-    closesocket(client_fd);
+    listen(ListenSocket, 1);
+
+    while (1) {
+        ClientSocket = accept(ListenSocket, (SOCKADDR*)&client, &clientLen);
+        if (ClientSocket == INVALID_SOCKET) {
+            printf("accept failed: %d\n", WSAGetLastError());
+            closesocket(ListenSocket);
+            WSACleanup();
+            return 1;
+        }
+
+        if (recv(ClientSocket, recvbuf, sizeof(recvbuf), 0)< 0) {
+            printf("recv failed with error: %d\n", WSAGetLastError());
+            closesocket(ClientSocket);
+            WSACleanup();
+            return 1;
+        }
+
+        if (shutdown(ClientSocket, SD_SEND) == SOCKET_ERROR) {
+            printf("shutdown failed with error: %d\n", WSAGetLastError());
+            closesocket(ClientSocket);
+            WSACleanup();
+            return 1;
+        }
+
+        printf("Received: %s", recvbuf);
+
+        closesocket(ClientSocket);
+    }
+
     WSACleanup();
+
     return 0;
 }
