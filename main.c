@@ -4,12 +4,12 @@
 #include <ws2tcpip.h>
 #include <stdio.h>
 
-#define PORT 23
+#define PORT 4
 
 int main()
 {
     WSADATA wsaData;
-    SOCKET listen_fd, client_fd;
+    SOCKET server_fd, client_fd;
     struct sockaddr_in server_addr, client_addr;
     int clientLen = sizeof(client_addr);
     char recvbuf[100];
@@ -19,7 +19,7 @@ int main()
         return 1;
     }
     //IPv4 adresleri üzerinden iletiþim saðlayan - SOCK_STREAM(TCP) tipinde soket - soketin kullanacaðý taþýma protokolü (TCP
-    if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
         printf("socket failed: %d\n", WSAGetLastError());
         WSACleanup(); //API'yi temizle - Socketler serbest
         return 1;
@@ -33,23 +33,23 @@ int main()
     server_addr.sin_port = htons(PORT);
 
     //bu server_addr'in IP atamasýný yap - inet_pton -> IP'yi text to Binary
-    if (inet_pton(AF_INET, "192.168.0.36", &server_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "192.168.254.19", &server_addr.sin_addr) <= 0) {
         printf("Invalid address");
         return 1;
     }
 
     //Server soketini(listen_fd) server_addr ile iliþkilendir 
-    if (bind(listen_fd, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+    if (bind(server_fd, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
         printf("bind failed: %d\n", WSAGetLastError());
-        closesocket(listen_fd);
+        closesocket(server_fd);
         WSACleanup();
         return 1;
     }
 
     //listen_fd soketinin gelen baðlantýlarý dinlemesini saðlar - ayný anda max 1 tane baðlantý kabul edebilir 
-    if (listen(listen_fd, 1) == SOCKET_ERROR) {
+    if (listen(server_fd, 1) == SOCKET_ERROR) {
         printf("listen failed: %d\n", WSAGetLastError());
-        closesocket(listen_fd);
+        closesocket(server_fd);
         WSACleanup();
         return 1;
     }
@@ -59,9 +59,9 @@ int main()
         //accept() - yeni bir baðlantý isteði geldiðinde yeni bir socket oluþturur
         //listen_fd soketini kullanarak gelen baðlantýlarý kabul eder - Client'a ait bilgileri -> IP ve Port'u tutan client_addr ile verdik
         //accept'ten önce socket() ile client_fd soketini oluþturmaya gerek yok
-        if ((client_fd = accept(listen_fd, (SOCKADDR*)&client_addr, &clientLen)) == INVALID_SOCKET) {
+        if ((client_fd = accept(server_fd, (SOCKADDR*)&client_addr, &clientLen)) == INVALID_SOCKET) {
             printf("accept failed: %d\n", WSAGetLastError());
-            closesocket(listen_fd);
+            closesocket(server_fd);
             WSACleanup();
             return 1;
         }
@@ -87,7 +87,6 @@ int main()
         printf("Received: %s", recvbuf);
 
         closesocket(client_fd);
-        break;
     }
 
     WSACleanup();
