@@ -5,40 +5,37 @@
 #include <stdio.h>
 
 #define PORT 4
+#define CLIENT_SIZE 2
 
-int main()
-{
+int main() {
     WSADATA wsaData;
-    SOCKET server_fd, client_fd;
-    struct sockaddr_in server_addr, client_addr;
-    int clientLen = sizeof(client_addr);
+    SOCKET server_fd, client_fd[CLIENT_SIZE];
+    struct sockaddr_in server_addr, client_addr[CLIENT_SIZE];
     char recvbuf[100];
 
+    // WSA baþlatma
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         printf("WSAStartup failed: %d\n", WSAGetLastError());
         return 1;
     }
-    //IPv4 adresleri üzerinden iletiþim saðlayan - SOCK_STREAM(TCP) tipinde soket - soketin kullanacaðý taþýma protokolü (TCP
+
+    // Sunucu soketini oluþturma
     if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
         printf("socket failed: %d\n", WSAGetLastError());
-        WSACleanup(); //API'yi temizle - Socketler serbest
+        WSACleanup();
         return 1;
     }
-    /*  if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-          printf("\n Socket creation error \n");
-          return 1;
-      }*/
-      //server_addr struct'ýnýn özelliklerini ata
+
+    // Sunucu adresini ve port numarasýný ayarlama
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-
-    //bu server_addr'in IP atamasýný yap - inet_pton -> IP'yi text to Binary
-    if (inet_pton(AF_INET, "192.168.254.19", &server_addr.sin_addr) <= 0) {
-        printf("Invalid address");
+    
+    if (inet_pton(AF_INET,"192.168.254.19",&server_addr.sin_addr) <= 0) {
+        printf("Invalid IP address for server\n");
         return 1;
     }
 
-    //Server soketini(listen_fd) server_addr ile iliþkilendir 
+     //Server soketini(server_fd) server_addr ile iliþkilendir 
     if (bind(server_fd, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
         printf("bind failed: %d\n", WSAGetLastError());
         closesocket(server_fd);
@@ -46,8 +43,8 @@ int main()
         return 1;
     }
 
-    //listen_fd soketinin gelen baðlantýlarý dinlemesini saðlar - ayný anda max 1 tane baðlantý kabul edebilir 
-    if (listen(server_fd, 1) == SOCKET_ERROR) {
+    // Baðlantýlarý dinleme
+    if (listen(server_fd, 2) == SOCKET_ERROR){ // Maksimum 2 istemci baðlantýsýný kabul eder
         printf("listen failed: %d\n", WSAGetLastError());
         closesocket(server_fd);
         WSACleanup();
@@ -56,39 +53,50 @@ int main()
     printf("Server listening on port %d\n", PORT);
 
     while (1) {
-        //accept() - yeni bir baðlantý isteði geldiðinde yeni bir socket oluþturur
-        //listen_fd soketini kullanarak gelen baðlantýlarý kabul eder - Client'a ait bilgileri -> IP ve Port'u tutan client_addr ile verdik
-        //accept'ten önce socket() ile client_fd soketini oluþturmaya gerek yok
-        if ((client_fd = accept(server_fd, (SOCKADDR*)&client_addr, &clientLen)) == INVALID_SOCKET) {
-            printf("accept failed: %d\n", WSAGetLastError());
-            closesocket(server_fd);
-            WSACleanup();
-            return 1;
-        }
-        //Kabul edilen client_fd soketi üzerinden veri almak için kullanýlýr
-        int bytesReceived = recv(client_fd, recvbuf, sizeof(recvbuf), 0);
-        if (bytesReceived < 0) {
-            printf("recv failed with error: %d\n", WSAGetLastError());
-            closesocket(client_fd);
-            WSACleanup();
-            return 1;
-        }
-        recvbuf[bytesReceived] = '\0';
-
-        //client fd soketinin Veri gönderme yönünü kapatýr -
-        //SD_RECEIVE veri alma yönünü kapatmak için - SD_BOTH çift yönü 
-        if (shutdown(client_fd, SD_SEND) == SOCKET_ERROR) {
-            printf("shutdown failed with error: %d\n", WSAGetLastError());
-            closesocket(client_fd);
-            WSACleanup();
-            return 1;
+        for (int i = 0; i < CLIENT_SIZE; ++i) {
+            // Ýstemci baðlantýsýný kabul etme
+            int clientLen = sizeof(client_addr[i]);
+            if ((client_fd[i] = accept(server_fd, (SOCKADDR*)&client_addr[i], &clientLen)) == INVALID_SOCKET) {
+                printf("accept failed: %d\n", WSAGetLastError());
+                closesocket(server_fd);
+                WSACleanup();
+                return 1;
+            }
+            printf("Client %d connected.\n", i + 1);
         }
 
-        printf("Received: %s", recvbuf);
+        for (int i = 0; i < CLIENT_SIZE; ++i) {
+            // Client'tan gelen veriyi alma
+            int bytesReceived = recv(client_fd[i], recvbuf, sizeof(recvbuf), 0);
+            if (bytesReceived < 0) {
+                printf("recv failed with error: %d\n", WSAGetLastError());
+                closesocket(client_fd[i]);
+                closesocket(server_fd);
+                WSACleanup();
+                return 1;
+            }
+            recvbuf[bytesReceived] = '\0';
+            printf("Received from client %d: %s\n", i + 1, recvbuf);
 
-        closesocket(client_fd);
+            // Ýstemciye mesaj gönderme
+            const char* message = "Hello from server";
+            if (send(client_fd[i], message, strlen(message), 0) != strlen(message)) {
+                printf("send failed with error: %d\n", WSAGetLastError());
+                closesocket(client_fd[i]);
+                closesocket(server_fd);
+                WSACleanup();
+                return 1;
+            }
+
+            
+
+            // Ýstemci soketini kapatma
+            closesocket(client_fd[i]);
+        }
+
     }
-
+    
+    closesocket(server_fd);
     WSACleanup();
 
     return 0;
