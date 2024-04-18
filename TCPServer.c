@@ -6,7 +6,7 @@
 
 #define PORT 23
 
-int main()
+int TCPServer()
 {
     WSADATA wsaData;
     SOCKET listen_fd, client_fd;
@@ -24,12 +24,12 @@ int main()
         WSACleanup(); //API'yi temizle - Socketler serbest
         return 1;
     }
-    /*  if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-          printf("\n Socket creation error \n");
-          return 1;
-      }*/
-      //server_addr struct'ýnýn özelliklerini ata
-    server_addr.sin_family = AF_INET;
+  /*  if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+        printf("\n Socket creation error \n");
+        return 1;
+    }*/
+    //server_addr struct'ýnýn özelliklerini ata
+    server_addr.sin_family = AF_INET; 
     server_addr.sin_port = htons(PORT);
 
     //bu server_addr'in IP atamasýný yap - inet_pton -> IP'yi text to Binary
@@ -73,7 +73,7 @@ int main()
             WSACleanup();
             return 1;
         }
-        recvbuf[bytesReceived] = '\0';
+        recvbuf[bytesReceived-1] = '\0';
 
         //client fd soketinin Veri gönderme yönünü kapatýr -
         //SD_RECEIVE veri alma yönünü kapatmak için - SD_BOTH çift yönü 
@@ -87,7 +87,6 @@ int main()
         printf("Received: %s", recvbuf);
 
         closesocket(client_fd);
-        break;
     }
 
     WSACleanup();

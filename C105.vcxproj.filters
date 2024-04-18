@@ -21,6 +21,9 @@
     <ClCompile Include="TCPClient.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TCPServer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TCPClient.h">

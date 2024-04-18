@@ -129,6 +129,7 @@
   <ItemGroup>
     <ClCompile Include="main.c" />
     <ClCompile Include="TCPClient.c" />
+    <ClCompile Include="TCPServer.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TCPClient.h" />
